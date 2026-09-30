@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Slack Channel Migration Tool</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 2rem; max-width: 650px; margin: auto; background-color: #f8f9fa; }
+    .card { background: white; border: 1px solid #e1e4e8; border-radius: 8px; padding: 2rem; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+    button { background-color: #4A154B; color: white; border: none; padding: 10px 16px; border-radius: 4px; cursor: pointer; font-size: 1rem; font-weight: 600; margin-right: 10px; }
+    button:hover { background-color: #611f69; }
+    button:disabled { background-color: #ccc; cursor: not-allowed; }
+    .hidden { display: none; }
+    .section { margin-bottom: 2rem; }
+    .badge { padding: 3px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: bold; margin-right: 8px; }
+    .badge-public { background-color: #e3f2fd; color: #0d47a1; }
+    .badge-private { background-color: #fff3e0; color: #e65100; }
+    ul { background: #f4f4f4; padding: 1rem 1.5rem; border-radius: 6px; max-height: 250px; overflow-y: auto; list-style: none; margin-top: 10px; }
+    li { padding: 6px 0; border-bottom: 1px solid #e0e0e0; display: flex; align-items: center; }
+  </style>
+</head>
+<body>
+
+  <div class="card">
+    <h2>Slack Channel Migration Service</h2>
+
+    <div id="auth-section">
+      <p>Connect your Slack workspace to export or import channel memberships:</p>
+      <button onclick="window.location.href='/auth/slack'">Connect with Slack</button>
+    </div>
+
+    <div id="app-section" class="hidden">
+      <p>Logged in User ID: <strong id="user-id">---</strong></p>
+      
+      <div class="section">
+        <h3>1. Download Channels</h3>
+        <p>Export a signed, tamper-proof JSON file of your active channels.</p>
+        <button onclick="downloadChannels()">Export Channel JSON</button>
+      </div>
+
+      <hr>
+
+      <div class="section">
+        <h3>2. Import Channels</h3>
+        <p>Upload your signed JSON to re-join public channels and trigger bot invites for private channels.</p>
+        <input type="file" id="fileInput" accept=".json"><br><br>
+        <button id="importBtn" onclick="importChannels()">Import Channels</button>
+      </div>
+
+      <div id="logs" class="hidden">
+        <h3>Import Results:</h3>
+        <ul id="logList"></ul>
+      </div>
+
+      <br>
+      <button onclick="logout()" style="background:#d9534f;">Disconnect</button>
+    </div>
+  </div>
+
+  <script>
+    async function checkAuth() {
+      const res = await fetch('/api/status');
+      if (res.status === 403) {
+        document.body.innerHTML = '<h2 style="color:red; text-align:center; margin-top:50px;">403 Forbidden: Access denied from your IP address.</h2>';
+        return;
+      }
+      const data = await res.json();
+      if (data.authenticated) {
+        document.getElementById('auth-section').classList.add('hidden');
+        document.getElementById('app-section').classList.remove('hidden');
+        document.getElementById('user-id').textContent = data.userId;
+      }
+    }
+
+    function downloadChannels() {
+      window.location.href = '/api/export-channels';
+    }
+
+    async function importChannels() {
+      const fileInput = document.getElementById('fileInput');
+      if (!fileInput.files.length) {
+        alert('Please select a signed JSON file to import.');
+        return;
+      }
+
+      const file = fileInput.files[0];
+      const reader = new FileReader();
+
+      reader.onload = async (e) => {
+        const importBtn = document.getElementById('importBtn');
+        importBtn.disabled = true;
+        importBtn.textContent = 'Processing import...';
+
+        try {
+          const payload = JSON.parse(e.target.result);
+          const response = await fetch('/api/import-channels', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+
+          const data = await response.json();
+          if (!response.ok) {
+            alert('Import Error: ' + data.error);
+          } else {
+            displayLogs(data.results);
+          }
+        } catch (err) {
+          alert('Failed to process file or server response.');
+        } finally {
+          importBtn.disabled = false;
+          importBtn.textContent = 'Import Channels';
+        }
+      };
+
+      reader.readAsText(file);
+    }
+
+    function displayLogs(results) {
+      const logList = document.getElementById('logList');
+      const logsContainer = document.getElementById('logs');
+      logList.innerHTML = '';
+
+      results.forEach(item => {
+        const li = document.createElement('li');
+        const badgeClass = item.type === 'Public' ? 'badge-public' : 'badge-private';
+        
+        li.innerHTML = `
+          <span class="badge ${badgeClass}">${item.type}</span>
+          <strong>#${item.name}</strong>: ${item.status}
+        `;
+        logList.appendChild(li);
+      });
+
+      logsContainer.classList.remove('hidden');
+    }
+
+    async function logout() {
+      await fetch('/api/logout');
+      window.location.reload();
+    }
+
+    checkAuth();
+  </script>
+</body>
+</html>

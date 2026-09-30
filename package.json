@@ -1,0 +1,15 @@
+{
+  "name": "slack-channel-migrator",
+  "version": "1.0.0",
+  "description": "Secure Slack channel migration and rejoin service with HMAC validation and IP whitelisting",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@slack/web-api": "^7.0.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "express-session": "^1.18.0"
+  }
+}
