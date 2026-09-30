@@ -39,7 +39,7 @@ app.use(session({
 }));
 
 const botClient = new WebClient(process.env.SLACK_BOT_TOKEN);
-const USER_SCOPES = ['channels:read', 'groups:read', 'channels:join'].join(',');
+const USER_SCOPES = ['channels:read', 'groups:read', 'channels:write'].join(',');
 
 // 1. Redirect to Slack OAuth
 app.get('/auth/slack', (req, res) => {
